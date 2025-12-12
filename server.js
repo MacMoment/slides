@@ -328,9 +328,9 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log('╔════════════════════════════════════════════════════════════════╗');
   console.log('║         🎨 AI Slideshow Generator - Ready!                      ║');
   console.log('╠════════════════════════════════════════════════════════════════╣');
-  console.log(`║  🌐 Server:  http://0.0.0.0:${PORT}                              ║`);
-  console.log(`║  📊 Model:   ${MEGALLM_MODEL.padEnd(30)}          ║`);
-  console.log(`║  🔑 API:     ${apiStatus.configured ? 'Configured ✓'.padEnd(30) : 'Not configured ✗'.padEnd(30)}          ║`);
+  console.log(`║  🌐 Server:  http://0.0.0.0:${String(PORT).padEnd(5)}                             ║`);
+  console.log(`║  📊 Model:   ${MEGALLM_MODEL.substring(0, 40).padEnd(40)}   ║`);
+  console.log(`║  🔑 API:     ${apiStatus.configured ? 'Configured ✓'.padEnd(40) : 'Not configured ✗'.padEnd(40)}   ║`);
   console.log('╚════════════════════════════════════════════════════════════════╝');
   console.log('');
 });
