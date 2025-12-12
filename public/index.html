@@ -1,0 +1,990 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Slideshow Generator</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            color: #fff;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        header {
+            text-align: center;
+            padding: 40px 20px;
+        }
+
+        h1 {
+            font-size: 3rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            color: #a0a0a0;
+            font-size: 1.1rem;
+        }
+
+        .input-section {
+            max-width: 800px;
+            margin: 40px auto;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 20px;
+            padding: 40px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .input-group {
+            display: flex;
+            gap: 15px;
+        }
+
+        textarea {
+            flex: 1;
+            padding: 20px;
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            background: rgba(255, 255, 255, 0.05);
+            color: #fff;
+            font-size: 1rem;
+            font-family: inherit;
+            resize: vertical;
+            min-height: 100px;
+            transition: all 0.3s ease;
+        }
+
+        textarea:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 20px rgba(102, 126, 234, 0.3);
+        }
+
+        textarea::placeholder {
+            color: rgba(255, 255, 255, 0.4);
+        }
+
+        .btn {
+            padding: 20px 40px;
+            border: none;
+            border-radius: 15px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #fff;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 40px;
+        }
+
+        .loading.active {
+            display: block;
+        }
+
+        .spinner {
+            width: 60px;
+            height: 60px;
+            border: 4px solid rgba(255, 255, 255, 0.1);
+            border-top-color: #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .presentation-container {
+            display: none;
+            margin-top: 40px;
+        }
+
+        .presentation-container.active {
+            display: block;
+        }
+
+        .toolbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+            margin-bottom: 20px;
+        }
+
+        .toolbar-left {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .slide-counter {
+            color: #a0a0a0;
+        }
+
+        .toolbar-right {
+            display: flex;
+            gap: 10px;
+        }
+
+        .btn-nav {
+            padding: 10px 20px;
+            background: rgba(255, 255, 255, 0.1);
+            color: #fff;
+        }
+
+        .btn-nav:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .btn-export {
+            background: #10b981;
+            color: #fff;
+        }
+
+        .btn-export:hover {
+            background: #059669;
+        }
+
+        .slideshow-wrapper {
+            display: flex;
+            gap: 20px;
+        }
+
+        .slide-thumbnails {
+            width: 200px;
+            max-height: 600px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            padding-right: 10px;
+        }
+
+        .thumbnail {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            padding: 10px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border: 2px solid transparent;
+        }
+
+        .thumbnail:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .thumbnail.active {
+            border-color: #667eea;
+            background: rgba(102, 126, 234, 0.2);
+        }
+
+        .thumbnail-num {
+            font-size: 0.8rem;
+            color: #a0a0a0;
+            margin-bottom: 5px;
+        }
+
+        .thumbnail-title {
+            font-size: 0.9rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .slide-main {
+            flex: 1;
+            background: #fff;
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            aspect-ratio: 16/9;
+            position: relative;
+        }
+
+        .slide {
+            width: 100%;
+            height: 100%;
+            padding: 60px;
+            display: none;
+            flex-direction: column;
+            color: #333;
+        }
+
+        .slide.active {
+            display: flex;
+        }
+
+        .slide-title-slide {
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+        }
+
+        .slide-title-slide h2 {
+            font-size: 3rem;
+            font-weight: 700;
+            margin-bottom: 20px;
+        }
+
+        .slide-title-slide .slide-subtitle {
+            font-size: 1.5rem;
+            color: #666;
+        }
+
+        .slide-content h3 {
+            font-size: 2rem;
+            font-weight: 600;
+            margin-bottom: 30px;
+        }
+
+        .slide-content ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        .slide-content li {
+            font-size: 1.3rem;
+            padding: 10px 0;
+            padding-left: 40px;
+            position: relative;
+        }
+
+        .slide-content li::before {
+            content: '▸';
+            position: absolute;
+            left: 0;
+            color: #667eea;
+            font-size: 1.5rem;
+        }
+
+        .slide-comparison {
+            display: flex;
+            gap: 40px;
+            flex: 1;
+            margin-top: 20px;
+        }
+
+        .comparison-column {
+            flex: 1;
+            background: rgba(0, 0, 0, 0.03);
+            border-radius: 15px;
+            padding: 30px;
+        }
+
+        .comparison-column h4 {
+            font-size: 1.3rem;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #667eea;
+        }
+
+        .slide-chart {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-top: 20px;
+        }
+
+        .slide-chart canvas {
+            max-width: 100%;
+            max-height: 100%;
+        }
+
+        .slide-quote {
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+        }
+
+        .quote-text {
+            font-size: 2rem;
+            font-style: italic;
+            color: #333;
+            max-width: 800px;
+            line-height: 1.6;
+        }
+
+        .quote-text::before {
+            content: '"';
+            font-size: 4rem;
+            color: #667eea;
+            display: block;
+            margin-bottom: -20px;
+        }
+
+        .quote-author {
+            margin-top: 30px;
+            font-size: 1.2rem;
+            color: #666;
+        }
+
+        .slide-image {
+            position: relative;
+        }
+
+        .image-container {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-top: 20px;
+            background: rgba(0, 0, 0, 0.05);
+            border-radius: 15px;
+            overflow: hidden;
+        }
+
+        .image-container img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+        }
+
+        .image-placeholder {
+            padding: 60px;
+            text-align: center;
+            color: #999;
+        }
+
+        .image-placeholder i {
+            font-size: 4rem;
+            margin-bottom: 20px;
+        }
+
+        .speaker-notes {
+            margin-top: 20px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+            padding: 20px;
+        }
+
+        .speaker-notes h4 {
+            color: #a0a0a0;
+            font-size: 0.9rem;
+            margin-bottom: 10px;
+        }
+
+        .speaker-notes p {
+            color: #ddd;
+            line-height: 1.6;
+        }
+
+        .error-message {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            color: #f87171;
+            padding: 20px;
+            border-radius: 15px;
+            margin-top: 20px;
+            display: none;
+        }
+
+        .error-message.active {
+            display: block;
+        }
+
+        /* Scrollbar styling */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        @media (max-width: 900px) {
+            .slideshow-wrapper {
+                flex-direction: column;
+            }
+
+            .slide-thumbnails {
+                width: 100%;
+                flex-direction: row;
+                overflow-x: auto;
+                max-height: none;
+            }
+
+            .thumbnail {
+                min-width: 150px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>✨ AI Slideshow Generator</h1>
+            <p class="subtitle">Create stunning presentations powered by AI</p>
+        </header>
+
+        <div class="input-section">
+            <div class="input-group">
+                <textarea id="topicInput" placeholder="Enter your presentation topic...&#10;&#10;Example: 'The Future of Renewable Energy' or 'Introduction to Machine Learning for Beginners'"></textarea>
+            </div>
+            <div style="margin-top: 20px; text-align: center;">
+                <button class="btn btn-primary" id="generateBtn" onclick="generatePresentation()">
+                    🎨 Generate Presentation
+                </button>
+            </div>
+        </div>
+
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p>Creating your presentation with AI magic...</p>
+            <p style="color: #a0a0a0; font-size: 0.9rem; margin-top: 10px;">This may take 30-60 seconds</p>
+        </div>
+
+        <div class="error-message" id="error"></div>
+
+        <div class="presentation-container" id="presentation">
+            <div class="toolbar">
+                <div class="toolbar-left">
+                    <span class="slide-counter" id="slideCounter">Slide 1 of 10</span>
+                </div>
+                <div class="toolbar-right">
+                    <button class="btn btn-nav" onclick="prevSlide()">← Previous</button>
+                    <button class="btn btn-nav" onclick="nextSlide()">Next →</button>
+                    <button class="btn btn-export" onclick="exportToHTML()">📥 Export HTML</button>
+                    <button class="btn btn-export" onclick="exportToGoogleSlides()">📊 Google Slides Instructions</button>
+                </div>
+            </div>
+
+            <div class="slideshow-wrapper">
+                <div class="slide-thumbnails" id="thumbnails"></div>
+                <div class="slide-main" id="slideMain"></div>
+            </div>
+
+            <div class="speaker-notes" id="speakerNotes">
+                <h4>📝 Speaker Notes</h4>
+                <p id="notesContent"></p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let presentation = null;
+        let currentSlide = 0;
+        let charts = [];
+
+        async function generatePresentation() {
+            const topic = document.getElementById('topicInput').value.trim();
+            
+            if (!topic) {
+                showError('Please enter a topic for your presentation');
+                return;
+            }
+
+            document.getElementById('generateBtn').disabled = true;
+            document.getElementById('loading').classList.add('active');
+            document.getElementById('presentation').classList.remove('active');
+            document.getElementById('error').classList.remove('active');
+
+            try {
+                const response = await fetch('/api/generate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ topic })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Failed to generate presentation');
+                }
+
+                presentation = data;
+                currentSlide = 0;
+                renderPresentation();
+                document.getElementById('presentation').classList.add('active');
+
+            } catch (error) {
+                showError(error.message);
+            } finally {
+                document.getElementById('generateBtn').disabled = false;
+                document.getElementById('loading').classList.remove('active');
+            }
+        }
+
+        function showError(message) {
+            const errorEl = document.getElementById('error');
+            errorEl.textContent = '❌ ' + message;
+            errorEl.classList.add('active');
+        }
+
+        function renderPresentation() {
+            if (!presentation) return;
+
+            // Destroy existing charts
+            charts.forEach(chart => chart.destroy());
+            charts = [];
+
+            const thumbnails = document.getElementById('thumbnails');
+            const slideMain = document.getElementById('slideMain');
+
+            thumbnails.innerHTML = '';
+            slideMain.innerHTML = '';
+
+            presentation.slides.forEach((slide, index) => {
+                // Create thumbnail
+                const thumb = document.createElement('div');
+                thumb.className = `thumbnail ${index === currentSlide ? 'active' : ''}`;
+                thumb.onclick = () => goToSlide(index);
+                thumb.innerHTML = `
+                    <div class="thumbnail-num">Slide ${index + 1}</div>
+                    <div class="thumbnail-title">${slide.title || presentation.title}</div>
+                `;
+                thumbnails.appendChild(thumb);
+
+                // Create slide
+                const slideEl = createSlideElement(slide, index);
+                slideMain.appendChild(slideEl);
+            });
+
+            updateSlideCounter();
+            updateSpeakerNotes();
+        }
+
+        function createSlideElement(slide, index) {
+            const slideEl = document.createElement('div');
+            slideEl.className = `slide ${index === currentSlide ? 'active' : ''}`;
+            slideEl.id = `slide-${index}`;
+
+            // Apply theme
+            const theme = presentation.theme || {
+                primaryColor: '#667eea',
+                secondaryColor: '#764ba2',
+                backgroundColor: '#ffffff',
+                textColor: '#333333'
+            };
+
+            slideEl.style.background = theme.backgroundColor;
+            slideEl.style.color = theme.textColor;
+
+            switch (slide.type) {
+                case 'title':
+                    slideEl.classList.add('slide-title-slide');
+                    slideEl.innerHTML = `
+                        <h2 style="color: ${theme.primaryColor}">${presentation.title}</h2>
+                        <p class="slide-subtitle">${presentation.subtitle || ''}</p>
+                    `;
+                    break;
+
+                case 'content':
+                    slideEl.classList.add('slide-content');
+                    slideEl.innerHTML = `
+                        <h3 style="color: ${theme.primaryColor}">${slide.title}</h3>
+                        <ul>
+                            ${(slide.content || []).map(item => `<li>${item}</li>`).join('')}
+                        </ul>
+                    `;
+                    break;
+
+                case 'comparison':
+                    slideEl.classList.add('slide-content');
+                    slideEl.innerHTML = `
+                        <h3 style="color: ${theme.primaryColor}">${slide.title}</h3>
+                        <div class="slide-comparison">
+                            <div class="comparison-column">
+                                <h4 style="border-color: ${theme.primaryColor}">${slide.leftColumn?.title || 'Left'}</h4>
+                                <ul>
+                                    ${(slide.leftColumn?.content || []).map(item => `<li>${item}</li>`).join('')}
+                                </ul>
+                            </div>
+                            <div class="comparison-column">
+                                <h4 style="border-color: ${theme.secondaryColor}">${slide.rightColumn?.title || 'Right'}</h4>
+                                <ul>
+                                    ${(slide.rightColumn?.content || []).map(item => `<li>${item}</li>`).join('')}
+                                </ul>
+                            </div>
+                        </div>
+                    `;
+                    break;
+
+                case 'chart':
+                    slideEl.classList.add('slide-content');
+                    const canvasId = `chart-${index}`;
+                    slideEl.innerHTML = `
+                        <h3 style="color: ${theme.primaryColor}">${slide.title}</h3>
+                        <div class="slide-chart">
+                            <canvas id="${canvasId}"></canvas>
+                        </div>
+                    `;
+                    
+                    // Create chart after DOM is ready
+                    setTimeout(() => {
+                        if (slide.chartData) {
+                            createChart(canvasId, slide.chartData, theme);
+                        }
+                    }, 100);
+                    break;
+
+                case 'quote':
+                    slideEl.classList.add('slide-quote');
+                    slideEl.innerHTML = `
+                        <p class="quote-text">${slide.quote?.text || ''}</p>
+                        <p class="quote-author" style="color: ${theme.primaryColor}">— ${slide.quote?.author || 'Unknown'}</p>
+                    `;
+                    break;
+
+                case 'image':
+                    slideEl.classList.add('slide-content slide-image');
+                    slideEl.innerHTML = `
+                        <h3 style="color: ${theme.primaryColor}">${slide.title}</h3>
+                        <div class="image-container">
+                            <div class="image-placeholder">
+                                <div style="font-size: 3rem; margin-bottom: 15px;">🖼️</div>
+                                <p>Image Search: "${slide.imageSearch || 'relevant image'}"</p>
+                                <p style="font-size: 0.9rem; margin-top: 10px;">Add your image here in Google Slides</p>
+                            </div>
+                        </div>
+                    `;
+                    break;
+
+                case 'conclusion':
+                    slideEl.classList.add('slide-content');
+                    const takeaways = presentation.keyTakeaways || slide.content || [];
+                    slideEl.innerHTML = `
+                        <h3 style="color: ${theme.primaryColor}">${slide.title || 'Key Takeaways'}</h3>
+                        <ul>
+                            ${takeaways.map(item => `<li>${item}</li>`).join('')}
+                        </ul>
+                    `;
+                    break;
+
+                default:
+                    slideEl.classList.add('slide-content');
+                    slideEl.innerHTML = `
+                        <h3 style="color: ${theme.primaryColor}">${slide.title}</h3>
+                        <ul>
+                            ${(slide.content || []).map(item => `<li>${item}</li>`).join('')}
+                        </ul>
+                    `;
+            }
+
+            return slideEl;
+        }
+
+        function createChart(canvasId, chartData, theme) {
+            const canvas = document.getElementById(canvasId);
+            if (!canvas) return;
+
+            const ctx = canvas.getContext('2d');
+            
+            const colors = [
+                theme.primaryColor,
+                theme.secondaryColor,
+                '#10b981',
+                '#f59e0b',
+                '#ef4444',
+                '#8b5cf6',
+                '#06b6d4',
+                '#ec4899'
+            ];
+
+            const chartConfig = {
+                type: chartData.type || 'bar',
+                data: {
+                    labels: chartData.labels || [],
+                    datasets: [{
+                        label: chartData.label || 'Data',
+                        data: chartData.values || [],
+                        backgroundColor: chartData.type === 'line' ? colors[0] + '33' : colors,
+                        borderColor: chartData.type === 'line' ? colors[0] : colors,
+                        borderWidth: 2,
+                        fill: chartData.type === 'line',
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: {
+                            display: chartData.type === 'pie' || chartData.type === 'doughnut'
+                        }
+                    },
+                    scales: chartData.type === 'pie' || chartData.type === 'doughnut' ? {} : {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            };
+
+            const chart = new Chart(ctx, chartConfig);
+            charts.push(chart);
+        }
+
+        function goToSlide(index) {
+            currentSlide = index;
+            updateActiveSlide();
+        }
+
+        function prevSlide() {
+            if (currentSlide > 0) {
+                currentSlide--;
+                updateActiveSlide();
+            }
+        }
+
+        function nextSlide() {
+            if (currentSlide < presentation.slides.length - 1) {
+                currentSlide++;
+                updateActiveSlide();
+            }
+        }
+
+        function updateActiveSlide() {
+            // Update slides
+            document.querySelectorAll('.slide').forEach((slide, index) => {
+                slide.classList.toggle('active', index === currentSlide);
+            });
+
+            // Update thumbnails
+            document.querySelectorAll('.thumbnail').forEach((thumb, index) => {
+                thumb.classList.toggle('active', index === currentSlide);
+            });
+
+            updateSlideCounter();
+            updateSpeakerNotes();
+        }
+
+        function updateSlideCounter() {
+            document.getElementById('slideCounter').textContent = 
+                `Slide ${currentSlide + 1} of ${presentation.slides.length}`;
+        }
+
+        function updateSpeakerNotes() {
+            const slide = presentation.slides[currentSlide];
+            const notes = slide.enhancedNotes || slide.notes || 'No speaker notes for this slide.';
+            document.getElementById('notesContent').textContent = notes;
+        }
+
+        function exportToHTML() {
+            if (!presentation) return;
+
+            const theme = presentation.theme || {
+                primaryColor: '#667eea',
+                secondaryColor: '#764ba2',
+                backgroundColor: '#ffffff',
+                textColor: '#333333'
+            };
+
+            let html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${presentation.title}</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"><\/script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', sans-serif; background: #1a1a2e; }
+        .slide { 
+            width: 100vw; 
+            height: 100vh; 
+            padding: 60px; 
+            display: flex; 
+            flex-direction: column;
+            background: ${theme.backgroundColor};
+            color: ${theme.textColor};
+            page-break-after: always;
+        }
+        .slide-title { justify-content: center; align-items: center; text-align: center; }
+        .slide-title h1 { font-size: 4rem; color: ${theme.primaryColor}; margin-bottom: 20px; }
+        .slide-title p { font-size: 1.8rem; color: #666; }
+        h2 { font-size: 2.5rem; color: ${theme.primaryColor}; margin-bottom: 40px; }
+        ul { list-style: none; padding: 0; }
+        li { font-size: 1.5rem; padding: 15px 0 15px 40px; position: relative; }
+        li::before { content: '▸'; position: absolute; left: 0; color: ${theme.primaryColor}; }
+        .chart-container { flex: 1; display: flex; justify-content: center; align-items: center; }
+        .comparison { display: flex; gap: 40px; flex: 1; }
+        .column { flex: 1; background: #f8f8f8; border-radius: 15px; padding: 30px; }
+        .column h3 { font-size: 1.5rem; border-bottom: 3px solid ${theme.primaryColor}; padding-bottom: 10px; margin-bottom: 20px; }
+        .quote { justify-content: center; align-items: center; text-align: center; }
+        .quote-text { font-size: 2rem; font-style: italic; max-width: 800px; }
+        .quote-author { margin-top: 30px; color: ${theme.primaryColor}; }
+    </style>
+</head>
+<body>`;
+
+            presentation.slides.forEach((slide, index) => {
+                html += `\n    <!-- Slide ${index + 1} -->\n`;
+                
+                switch (slide.type) {
+                    case 'title':
+                        html += `    <div class="slide slide-title">
+        <h1>${presentation.title}</h1>
+        <p>${presentation.subtitle || ''}</p>
+    </div>\n`;
+                        break;
+
+                    case 'content':
+                        html += `    <div class="slide">
+        <h2>${slide.title}</h2>
+        <ul>
+            ${(slide.content || []).map(item => `<li>${item}</li>`).join('\n            ')}
+        </ul>
+    </div>\n`;
+                        break;
+
+                    case 'comparison':
+                        html += `    <div class="slide">
+        <h2>${slide.title}</h2>
+        <div class="comparison">
+            <div class="column">
+                <h3>${slide.leftColumn?.title || 'Left'}</h3>
+                <ul>${(slide.leftColumn?.content || []).map(item => `<li>${item}</li>`).join('')}</ul>
+            </div>
+            <div class="column">
+                <h3>${slide.rightColumn?.title || 'Right'}</h3>
+                <ul>${(slide.rightColumn?.content || []).map(item => `<li>${item}</li>`).join('')}</ul>
+            </div>
+        </div>
+    </div>\n`;
+                        break;
+
+                    case 'chart':
+                        html += `    <div class="slide">
+        <h2>${slide.title}</h2>
+        <div class="chart-container">
+            <canvas id="chart${index}"></canvas>
+        </div>
+    </div>\n`;
+                        break;
+
+                    case 'quote':
+                        html += `    <div class="slide quote">
+        <p class="quote-text">"${slide.quote?.text || ''}"</p>
+        <p class="quote-author">— ${slide.quote?.author || 'Unknown'}</p>
+    </div>\n`;
+                        break;
+
+                    default:
+                        html += `    <div class="slide">
+        <h2>${slide.title}</h2>
+        <ul>
+            ${(slide.content || []).map(item => `<li>${item}</li>`).join('\n            ')}
+        </ul>
+    </div>\n`;
+                }
+            });
+
+            // Add chart initialization scripts
+            html += `\n    <script>
+        const charts = ${JSON.stringify(presentation.slides.filter(s => s.type === 'chart').map((s, i) => ({
+            index: presentation.slides.indexOf(s),
+            data: s.chartData
+        })))};
+        
+        charts.forEach(chart => {
+            const ctx = document.getElementById('chart' + chart.index);
+            if (ctx && chart.data) {
+                new Chart(ctx, {
+                    type: chart.data.type || 'bar',
+                    data: {
+                        labels: chart.data.labels,
+                        datasets: [{
+                            label: chart.data.label,
+                            data: chart.data.values,
+                            backgroundColor: ['#667eea', '#764ba2', '#10b981', '#f59e0b', '#ef4444'],
+                            borderWidth: 1
+                        }]
+                    },
+                    options: { responsive: true }
+                });
+            }
+        });
+    <\/script>
+</body>
+</html>`;
+
+            // Download
+            const blob = new Blob([html], { type: 'text/html' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${presentation.title.replace(/[^a-z0-9]/gi, '_')}.html`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function exportToGoogleSlides() {
+            alert(`To import into Google Slides:
+
+1. Export as HTML first (click "Export HTML" button)
+2. Open Google Slides (slides.google.com)
+3. Create a new presentation
+4. Manually recreate slides using the HTML as a reference
+5. For charts: Use Insert > Chart and input the data
+6. For images: Use Insert > Image and search for the suggested terms
+
+Tip: The HTML file can be printed to PDF for a quick shareable version!
+
+Presentation Structure:
+- Title: ${presentation.title}
+- Slides: ${presentation.slides.length}
+- Theme colors: ${presentation.theme?.primaryColor || '#667eea'}`);
+        }
+
+        // Keyboard navigation
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowLeft') prevSlide();
+            if (e.key === 'ArrowRight') nextSlide();
+        });
+    </script>
+</body>
+</html>
