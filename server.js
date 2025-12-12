@@ -6,17 +6,40 @@ const path = require('path');
 const rateLimit = require('express-rate-limit');
 
 const app = express();
-const PORT = 6767;
+const PORT = process.env.PORT || 6767;
 
 // MegaLLM API Configuration
 const MEGALLM_API_KEY = process.env.MEGALLM_API_KEY || '';
 const MEGALLM_MODEL = process.env.MEGALLM_MODEL || 'claude-opus-4-5-20251101';
 const MEGALLM_API_URL = process.env.MEGALLM_API_URL || 'https://api.anthropic.com/v1/messages';
 
+// API Status tracking
+let apiStatus = {
+  configured: false,
+  lastCheck: null,
+  healthy: false
+};
+
 // Validate API key on startup
 if (!MEGALLM_API_KEY) {
-  console.warn('⚠️  Warning: MEGALLM_API_KEY environment variable is not set.');
-  console.warn('   Set it using: export MEGALLM_API_KEY=your-api-key');
+  console.warn('');
+  console.warn('╔════════════════════════════════════════════════════════════════╗');
+  console.warn('║  ⚠️  WARNING: MEGALLM_API_KEY environment variable is not set  ║');
+  console.warn('╠════════════════════════════════════════════════════════════════╣');
+  console.warn('║  To enable AI generation, set your API key:                    ║');
+  console.warn('║                                                                ║');
+  console.warn('║  For Anthropic API:                                            ║');
+  console.warn('║    export MEGALLM_API_KEY=your-anthropic-api-key               ║');
+  console.warn('║                                                                ║');
+  console.warn('║  For OpenAI-compatible APIs:                                   ║');
+  console.warn('║    export MEGALLM_API_KEY=your-api-key                         ║');
+  console.warn('║    export MEGALLM_API_URL=https://your-api-endpoint            ║');
+  console.warn('╚════════════════════════════════════════════════════════════════╝');
+  console.warn('');
+  apiStatus.configured = false;
+} else {
+  apiStatus.configured = true;
+  console.log('✅ API key configured');
 }
 
 // Rate limiting - limit API requests to prevent abuse
@@ -89,6 +112,10 @@ async function callMegaLLM(messages, maxTokens = 8000) {
       }
     );
     
+    // Update API status on success
+    apiStatus.healthy = true;
+    apiStatus.lastCheck = new Date().toISOString();
+    
     // Handle different response formats
     if (isAnthropicFormat) {
       return response.data.content[0].text;
@@ -96,8 +123,31 @@ async function callMegaLLM(messages, maxTokens = 8000) {
       return response.data.choices[0].message.content;
     }
   } catch (error) {
+    // Update API status on failure
+    apiStatus.healthy = false;
+    apiStatus.lastCheck = new Date().toISOString();
+    
     console.error('MegaLLM API Error:', error.response?.data || error.message);
-    throw new Error(`API Error: ${error.response?.data?.error?.message || error.message}`);
+    
+    // Provide user-friendly error messages
+    const statusCode = error.response?.status;
+    const errorData = error.response?.data;
+    
+    if (statusCode === 401) {
+      throw new Error('Invalid API key. Please check your MEGALLM_API_KEY environment variable.');
+    } else if (statusCode === 429) {
+      throw new Error('API rate limit exceeded. Please wait a moment and try again.');
+    } else if (statusCode === 500 || statusCode === 502 || statusCode === 503) {
+      throw new Error('AI service is temporarily unavailable. Please try again later.');
+    } else if (error.code === 'ECONNABORTED') {
+      throw new Error('Request timed out. The AI service is taking too long to respond. Please try again.');
+    } else if (error.code === 'ENOTFOUND' || error.code === 'ECONNREFUSED') {
+      throw new Error('Cannot connect to AI service. Please check your internet connection.');
+    } else if (errorData?.error?.message) {
+      throw new Error(`AI Service Error: ${errorData.error.message}`);
+    } else {
+      throw new Error('Failed to generate presentation. Please try again.');
+    }
   }
 }
 
@@ -244,9 +294,21 @@ app.post('/api/generate', apiLimiter, async (req, res) => {
   }
 });
 
-// Health check
+// Health check - provides detailed status
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', model: MEGALLM_MODEL });
+  const status = {
+    status: apiStatus.configured ? 'ok' : 'unconfigured',
+    model: MEGALLM_MODEL,
+    apiConfigured: apiStatus.configured,
+    lastCheck: apiStatus.lastCheck,
+    healthy: apiStatus.healthy
+  };
+  
+  if (!apiStatus.configured) {
+    status.message = 'API key not configured. Set MEGALLM_API_KEY environment variable.';
+  }
+  
+  res.json(status);
 });
 
 // Serve main page (rate limited to prevent abuse)
@@ -262,6 +324,13 @@ app.get('/', staticLimiter, (req, res) => {
 });
 
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`🎨 AI Slideshow Generator running on http://0.0.0.0:${PORT}`);
-  console.log(`📊 Using model: ${MEGALLM_MODEL}`);
+  console.log('');
+  console.log('╔════════════════════════════════════════════════════════════════╗');
+  console.log('║         🎨 AI Slideshow Generator - Ready!                      ║');
+  console.log('╠════════════════════════════════════════════════════════════════╣');
+  console.log(`║  🌐 Server:  http://0.0.0.0:${String(PORT).padEnd(5)}                             ║`);
+  console.log(`║  📊 Model:   ${MEGALLM_MODEL.substring(0, 40).padEnd(40)}   ║`);
+  console.log(`║  🔑 API:     ${apiStatus.configured ? 'Configured ✓'.padEnd(40) : 'Not configured ✗'.padEnd(40)}   ║`);
+  console.log('╚════════════════════════════════════════════════════════════════╝');
+  console.log('');
 });
