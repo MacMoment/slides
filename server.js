@@ -3,14 +3,30 @@ const cors = require('cors');
 const axios = require('axios');
 const { v4: uuidv4 } = require('uuid');
 const path = require('path');
+const rateLimit = require('express-rate-limit');
 
 const app = express();
 const PORT = 6767;
 
 // MegaLLM API Configuration
-const MEGALLM_API_KEY = process.env.MEGALLM_API_KEY || 'sk-mega-5afc972137b1babc2e35a80adae4ad920ef2e65bf980ce488be0a502d03c30c7';
+const MEGALLM_API_KEY = process.env.MEGALLM_API_KEY || '';
 const MEGALLM_MODEL = process.env.MEGALLM_MODEL || 'claude-opus-4-5-20251101';
 const MEGALLM_API_URL = process.env.MEGALLM_API_URL || 'https://api.anthropic.com/v1/messages';
+
+// Validate API key on startup
+if (!MEGALLM_API_KEY) {
+  console.warn('⚠️  Warning: MEGALLM_API_KEY environment variable is not set.');
+  console.warn('   Set it using: export MEGALLM_API_KEY=your-api-key');
+}
+
+// Rate limiting - limit API requests to prevent abuse
+const apiLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 10, // limit each IP to 10 requests per minute
+  message: { error: 'Too many requests, please try again later.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
@@ -18,9 +34,14 @@ app.use(express.static('public'));
 
 // Helper function to call MegaLLM API (supports OpenAI-compatible and Anthropic formats)
 async function callMegaLLM(messages, maxTokens = 8000) {
+  if (!MEGALLM_API_KEY) {
+    throw new Error('API key not configured. Set MEGALLM_API_KEY environment variable.');
+  }
+  
   try {
-    // Detect API type based on URL
-    const isAnthropicFormat = MEGALLM_API_URL.includes('anthropic.com');
+    // Detect API type based on URL - check that anthropic.com is the host
+    const apiUrl = new URL(MEGALLM_API_URL);
+    const isAnthropicFormat = apiUrl.hostname === 'api.anthropic.com';
     
     let requestBody, headers;
     
@@ -195,7 +216,7 @@ Respond with ONLY valid JSON in this exact format:
 }
 
 // API endpoint to generate presentation
-app.post('/api/generate', async (req, res) => {
+app.post('/api/generate', apiLimiter, async (req, res) => {
   try {
     const { topic } = req.body;
     
@@ -228,8 +249,15 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', model: MEGALLM_MODEL });
 });
 
-// Serve main page
-app.get('/', (req, res) => {
+// Serve main page (rate limited to prevent abuse)
+const staticLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 100, // limit each IP to 100 requests per minute for static files
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+app.get('/', staticLimiter, (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 

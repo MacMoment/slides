@@ -26,16 +26,23 @@ npm install
 
 ### Configuration
 
-The application can be configured via environment variables:
+The application **requires** the API key to be set via environment variable:
+
+```bash
+export MEGALLM_API_KEY=your-api-key-here
+```
+
+Additional optional configuration:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `MEGALLM_API_KEY` | `sk-mega-...` | Your MegaLLM API key |
+| `MEGALLM_API_KEY` | *required* | Your MegaLLM/Anthropic API key |
 | `MEGALLM_MODEL` | `claude-opus-4-5-20251101` | The model to use |
 | `MEGALLM_API_URL` | `https://api.anthropic.com/v1/messages` | API endpoint URL |
 
 Example with custom API URL:
 ```bash
+export MEGALLM_API_KEY=your-api-key
 export MEGALLM_API_URL=https://your-custom-api.com/v1/chat/completions
 npm start
 ```
